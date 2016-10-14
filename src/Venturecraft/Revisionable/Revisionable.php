@@ -64,6 +64,10 @@ class Revisionable extends Eloquent
             $model->postSave();
         });
 
+        static::created(function($model){
+            $model->postCreate();
+        });
+
         static::deleted(function ($model) {
             $model->preSave();
             $model->postDelete();
@@ -152,6 +156,39 @@ class Revisionable extends Eloquent
                 $revision = new Revision;
                 \DB::table($revision->getTable())->insert($revisions);
             }
+        }
+    }
+
+    /**
+    * Called after record successfully created
+    */
+    public function postCreate()
+    {
+
+        // Check if we should store creations in our revision history
+        // Set this value to true in your model if you want to
+        if(empty($this->revisionCreationsEnabled))
+        {
+            // We should not store creations.
+            return false;
+        }
+
+        if ((!isset($this->revisionEnabled) || $this->revisionEnabled))
+        {
+            $revisions[] = array(
+                'revisionable_type' => get_class($this),
+                'revisionable_id' => $this->getKey(),
+                'key' => 'created_at',
+                'old_value' => null,
+                'new_value' => $this->created_at,
+                'user_id' => $this->getUserId(),
+                'created_at' => new \DateTime(),
+                'updated_at' => new \DateTime(),
+            );
+
+            $revision = new Revision;
+            \DB::table($revision->getTable())->insert($revisions);
+
         }
     }
 
@@ -286,7 +323,7 @@ class Revisionable extends Eloquent
 
     /**
      * Identifiable Name
-     * When displaying revision history, when a foreigh key is updated
+     * When displaying revision history, when a foreign key is updated
      * instead of displaying the ID, you can choose to display a string
      * of your choice, just override this method in your model
      * By default, it will fall back to the models ID.
@@ -300,10 +337,11 @@ class Revisionable extends Eloquent
 
     /**
      * Revision Unknown String
-     * When displaying revision history, when a foreigh key is updated
+     * When displaying revision history, when a foreign key is updated
      * instead of displaying the ID, you can choose to display a string
      * of your choice, just override this method in your model
      * By default, it will fall back to the models ID.
+     *
      * @return string an identifying name for the model
      */
     public function getRevisionNullString()
@@ -316,6 +354,7 @@ class Revisionable extends Eloquent
      * When displaying revision history, if the revisions value
      * cant be figured out, this is used instead.
      * It can be overridden.
+     *
      * @return string an identifying name for the model
      */
     public function getRevisionUnknownString()
